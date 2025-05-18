@@ -1,0 +1,37 @@
+#!/bin/bash
+SMTP_SERVER=${SMTP_SERVER:-"smtp.gmail.com"}
+SMTP_PORT=${SMTP_PORT:-555}
+SMTP_USER=${SMTP_USER:-"sender_email.com"}
+SMTP_PASSWORD=${SMTP_PASSWORD:-"sender_pswrd"}
+FROM_EMAIL=${FROM_EMAIL:-"$SMTP_USER"}
+TO_EMAIL=${TO_EMAIL:-"receiver_email.com"}
+SUBJECT=${SUBJECT:-"Disk usage alert"}
+BODY=${BODY:-"Less then 85% of disk space left"}
+
+# collect disk usage info using df --total
+df_res=$(df -h --total|grep ^total)
+read -ra df_res_array <<< "$df_res"
+disk_usage=${df_res_array[4]%\%}
+
+
+# sending email via curl
+if [ $disk_usage -ge 16 ]
+then
+echo "Sending email using $SMTP_SERVER..."
+response=$(curl \
+    --url "smtp://$SMTP_SERVER:$SMTP_PORT" \
+    --ssl-reqd \
+    --mail-from "$FROM_EMAIL" \
+    --mail-rcpt "$TO_EMAIL" \
+    --user "$SMTP_USER:$SMTP_PASSWORD" \
+    --upload-file <(echo -e "From: $FROM_EMAIL\nTo: $TO_EMAIL\nSubject: $SUBJECT\n\n$BODY") \
+    2>&1)
+if [[ $? -eq 0 ]]; then
+    echo "SUCCESS!"
+else
+    echo "ERROR: $response"
+    exit 1
+fi
+
+fi
+
